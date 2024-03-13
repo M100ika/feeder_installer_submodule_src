@@ -23,7 +23,7 @@ class ConfigGUI:
         self.root.title("Конфигуратор оборудования")
         self.arduino_find_button = None
         self.rfid_find_button = None
-        self.config_manager = ConfigManager("../config/config.ini")
+        self.config_manager = ConfigManager()
         self.create_style() 
         self.user_level = tk.StringVar(value="user")
         self.draw_gui()

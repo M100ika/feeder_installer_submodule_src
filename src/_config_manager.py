@@ -3,7 +3,7 @@ import os
 from loguru import logger
 
 class ConfigManager:
-    def __init__(self, path="../config/config.ini"):
+    def __init__(self, path="../../config/config.ini"):
         self.path = path
         if not os.path.exists(self.path):
             self.create_config()
