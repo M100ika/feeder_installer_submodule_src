@@ -1,5 +1,5 @@
 from _config_manager import ConfigManager
-import platform
+
 
 config_manager = ConfigManager()
 
@@ -49,20 +49,3 @@ SET_POWER_MESSAGES = {1:[0x53, 0x57, 0x00, 0x25, 0xFF, 0x21, 0xC3, 0x55, 0x02, 0
 
 RFID_READER_POWER = SET_POWER_MESSAGES.get(power_key)
 
-def is_raspberry_pi(): # проверяет ОС raspberry или нет. 
-    try:
-        with open('/proc/cpuinfo', 'r') as f:
-            for line in f:
-                if 'Hardware' in line:
-                    if 'BCM' in line:
-                        return "/etc/feeder/config.ini"
-    except IOError:
-        pass
-
-    platform_info = platform.uname()
-    if 'arm' in platform_info.machine:
-        return "/etc/feeder/config.ini"
-    
-    return "../../config/config.ini"
-
-CONFIG_FILE_PATH = is_raspberry_pi()

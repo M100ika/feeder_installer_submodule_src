@@ -2,6 +2,7 @@ import sys
 import subprocess
 import pkg_resources
 from pkg_resources import DistributionNotFound, VersionConflict
+import platform
 
 def should_install_requirement(requirement) -> str:
     should_install = False
@@ -26,5 +27,24 @@ def install_packages(requirement_list) -> list:
             logger.info("Requirements already satisfied (info).")
     except Exception as e:
         print(e)
+
+
+def is_raspberry_pi(): # проверяет ОС raspberry или нет. 
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if 'Hardware' in line:
+                    if 'BCM' in line:
+                        return "/etc/feeder/config.ini"
+    except IOError:
+        pass
+
+    platform_info = platform.uname()
+    if 'arm' in platform_info.machine:
+        return "/etc/feeder/config.ini"
+    
+    return "../../config/config.ini"
+
+CONFIG_FILE_PATH = is_raspberry_pi()
 
 

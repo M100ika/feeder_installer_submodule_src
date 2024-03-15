@@ -1,7 +1,7 @@
 import configparser
 import os
 from loguru import logger
-from _glb_val import CONFIG_FILE_PATH
+from _headers import CONFIG_FILE_PATH
 
 class ConfigManager:
     def __init__(self, path=CONFIG_FILE_PATH):

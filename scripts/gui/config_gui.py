@@ -9,9 +9,11 @@ import time
 from tkinter import simpledialog
 from functools import partial
 import datetime
+import os
 
-sys.path.append(str(Path(__file__).parent.parent / 'src'))
+sys.path.append(str(Path(__file__).parent.parent.parent / 'src'))
 
+from _headers import CONFIG_FILE_PATH
 from _config_manager import ConfigManager 
 from _chafon_rfid_lib import RFIDReader
 
@@ -23,7 +25,7 @@ class ConfigGUI:
         self.root.title("Конфигуратор оборудования")
         self.arduino_find_button = None
         self.rfid_find_button = None
-        self.config_manager = ConfigManager()
+        self.config_manager = ConfigManager(CONFIG_FILE_PATH if CONFIG_FILE_PATH == "/etc/feeder/config.ini" else "/home/maxat/Projects/Agrarka/feeder-installer/config/config.ini")
         self.create_style() 
         self.user_level = tk.StringVar(value="user")
         self.draw_gui()
@@ -301,9 +303,18 @@ class ConfigGUI:
 
 
 def main():
-    root = tk.Tk()
-    app = ConfigGUI(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        app = ConfigGUI(root)
+        root.mainloop()
+    except FileNotFoundError:
+        import configparser
+        config = configparser.ConfigParser()
+        path_file = os.path.expanduser('~/Desktop/file.txt')
+        installation_path= str(os.getcwd())
+        config['DEFAULT'] = {'InstallationPath': installation_path} 
+        with open(path_file, 'w') as configfile:
+            config.write(configfile)
 
 if __name__ == "__main__":
     main()
