@@ -1,9 +1,10 @@
 import configparser
 import os
 from loguru import logger
+from _glb_val import CONFIG_FILE_PATH
 
 class ConfigManager:
-    def __init__(self, path="../../config/config.ini"):
+    def __init__(self, path=CONFIG_FILE_PATH):
         self.path = path
         if not os.path.exists(self.path):
             self.create_config()
