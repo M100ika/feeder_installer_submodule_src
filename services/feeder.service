@@ -1,0 +1,16 @@
+[Unit]
+Description=feeder_v71.service Service
+After=network.target
+
+[Service]
+ExecStart=/home/pi/feeder_v71/feeder_installer_submodule_src/vfeeder/bin/python /home/pi/feeder_v71/feeder_installer_submodule_src/src/main_feeder.py
+WorkingDirectory=/home/pi/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target
+TimeoutStopSec=30

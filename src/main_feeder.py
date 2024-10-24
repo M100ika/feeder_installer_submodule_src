@@ -1,4 +1,4 @@
-"""Feeder version 3. Edition by Suieubayev Maxat.
+"""Feeder version 7.1. Edition by Suieubayev Maxat.
 main_feeder.py - это файл с основной логикой работы кормушки. 
 Contact number +7 775 818 48 43. Email maxat.suieubayev@gmail.com"""
 
@@ -15,19 +15,26 @@ from _config_manager import ConfigManager
 import os
 from _glb_val import DEBUG
 
+import platform
+import os
+
+try:
+    import RPi.GPIO as GPIO
+    log_dir = '/home/pi/feeder_v71/feeder_installer_submodule_src/feeder_installer_submodule_src\feeder_log'
+except RuntimeError:
+    from __gpio_simulator import MockGPIO as GPIO
+    log_dir = '../feeder_log'
+
 config_manager = ConfigManager()
 debug_level = "DEBUG" if DEBUG == 1 else "CRITICAL"
 
 """Инициализация logger для хранения записи о всех действиях программы"""
-logger.add('../feeder_log/feeder.log', format="{time} {level} {message}", 
+logger.add(f'{log_dir}\feeder.log', format="{time} {level} {message}", 
 level=debug_level, rotation="1 day", retention= '1 month', compression="zip")  
 
 """Инициализация logger для хранения записи об ошибках программы"""
-logger.add('../feeder_log/error_log/errors.log', format="{time} {level} {file}:{line} {message}", 
+logger.add(f'{log_dir}error_log\error.log', format="{time} {level} {file}:{line} {message}", 
 level="ERROR", rotation="1 day", retention= '1 month', compression="zip") 
-
-if not os.path.exists("../config/config.ini"): 
-    config_manager.create_config() 
        
 @logger.catch
 def main():

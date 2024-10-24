@@ -10,31 +10,25 @@ from _chafon_rfid_lib import RFIDReader
 from _sql_database import SqlDatabase
 from _config_manager import ConfigManager
 import _adc_data as ADC
-import time
-import requests
-import binascii
-import socket
-import json
-import threading
-import queue
-import time
-#import RPi.GPIO as GPIO
-import timeit
-import serial
-import time
-from serial.tools import list_ports
+
+import sys, select, json, time, requests, binascii, socket, os, timeit
+
+try:
+    import RPi.GPIO as GPIO
+except RuntimeError:
+    from __gpio_simulator import MockGPIO as GPIO
+
 from _glb_val import *
 
 config_manager = ConfigManager()
 
 
 def _get_relay_state() -> bool:
-    # GPIO.setmode(GPIO.BCM)
-    # GPIO.setup(RELAY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    # relay_state = GPIO.input(RELAY_PIN)
-    # GPIO.cleanup() 
-    # return relay_state == GPIO.HIGH
-    return 1
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(RELAY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    relay_state = GPIO.input(RELAY_PIN)
+    GPIO.cleanup() 
+    return relay_state == GPIO.HIGH
 
 
 def _check_relay_state(check_count=10, threshold=5) -> bool:
@@ -54,26 +48,22 @@ def _check_relay_state(check_count=10, threshold=5) -> bool:
 
 def initialize_arduino():
     try:
-        arduino_object = ADC.ArduinoSerial(ARDUINO_PORT)
-        arduino_object.connect()
-        if arduino_object.isOpen():
-            logger.info(f'Connection established on port {ARDUINO_PORT}')
-            try:
-                offset = float(config_manager.get_setting("Calibration", "offset"))
-                scale = float(config_manager.get_setting("Calibration", "scale"))
-                arduino_object.set_offset(offset)
-                arduino_object.set_scale(scale)
-            except Exception as e:
-                logger.error(f'Error setting calibration: {e}')
-                return None
-        else:
+        arduino_obj = ADC.ArduinoSerial(ARDUINO_PORT)
+        arduino_obj.connect()
+        
+        if not arduino_obj.isOpen():
             logger.error(f'Failed to open connection on port {ARDUINO_PORT}')
             return None
         
-        return arduino_object
-    
+        offset = float(config_manager.get_setting("Calibration", "offset"))
+        scale = float(config_manager.get_setting("Calibration", "scale"))
+        arduino_obj.set_offset(offset)
+        arduino_obj.set_scale(scale)
+        
+        return arduino_obj
+        
     except Exception as e:
-        logger.error(f'Error connecting to Arduino on port {ARDUINO_PORT}: {e}')
+        logger.error(f'Error connecting or setting calibration: {e}')
         return None
 
 
@@ -90,17 +80,6 @@ def __post_request(event_time, feed_time, animal_id, end_weight, feed_weight) ->
         }
     except ValueError as v:
         logger.error(f'__Post_request function error: {v}')
-
-
-def check_internet():
-    try:
-        response = requests.get("http://google.com")
-        if response.status_code == 200:
-            logger.info('Internet is on. Trying to send saved data...')
-            database = SqlDatabase()
-            database.internet_on()
-    except Exception as e:
-        logger.error(f'No internet: {e}')
 
 
 def __send_post(postData):
@@ -136,110 +115,107 @@ def _set_power_RFID_ethernet():
 
 
 def __connect_rfid_reader_ethernet():
-    try:    
-        logger.info('Start connect RFID function')
-        _set_power_RFID_ethernet()
+    try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((TCP_IP, TCP_PORT))
-            s.send(bytearray([0x53, 0x57, 0x00, 0x06, 0xff, 0x01, 0x00, 0x00, 0x00, 0x50])) 
+            s.setblocking(False)  # Установить сокет в неблокирующий режим
+
+            # Очищаем буфер перед началом
+            while True:
+                ready = select.select([s], [], [], 0.1)  # Ожидание данных в течение 0.1 секунды
+                if ready[0]:
+                    s.recv(BUFFER_SIZE)
+                else:
+                    break
+
+            s.setblocking(True)  # Возвращаем сокет в блокирующий режим
             s.settimeout(RFID_TIMEOUT)
+            s.send(bytearray([0x53, 0x57, 0x00, 0x06, 0xff, 0x01, 0x00, 0x00, 0x00, 0x50]))
+            
             for attempt in range(1, 4):
-                try:
+                ready = select.select([s], [], [], RFID_TIMEOUT)
+                if ready[0]:
                     data = s.recv(BUFFER_SIZE)
-                    animal_id = binascii.hexlify(data).decode('utf-8')[:-10][-12:]
-                    logger.info(f'After end: Animal ID: {animal_id}')
-                    return animal_id if animal_id != None else None
-                except socket.timeout:
-                    logger.info(f'Timeout occurred on attempt {attempt}')
+                    if data:
+                        full_animal_id = binascii.hexlify(data).decode('utf-8') 
+                        logger.info(f'Full rfid: {full_animal_id}')
+                        # animal_id = full_animal_id[:-10][-12:]
+                        # logger.info(f'Animal ID: {animal_id}')
+                        return full_animal_id[50:-5] if full_animal_id else None
+
         return None
     except Exception as e:
         logger.error(f'Error connect RFID reader {e}')
         return None
 
 
-def __get_input(message, channel): # Функция для получения введенного значения
-                                   # Ничего не менять ее!
-    response = input(message)
-    channel.put(response)
-
-
-def input_with_timeout(message, timeout):   # Функция создания второго потока.
-                                            # Временная задержка во время которой можно ввести значение
-                                            # Ничего не менять!
-    channel = queue.Queue()
-    message = message + " [{} sec timeout] ".format(timeout)
-    thread = threading.Thread(target=__get_input, args=(message, channel))
-    thread.daemon = True
-    thread.start()
-
-    try:
-        response = channel.get(True, timeout)
-        return response
-    except queue.Empty:
-        pass
-    return None
-
-
 def _calibrate_or_start():
     try:
         logger.info(f'\nTo calibrate the equipment, put a tick in the settings to calibration mode:\nActaul state is {"CALIBRATION_ON" if CALIBRATION_MODE else "CALIBRATION_OFF"}')
-        #logger.info(f'System pause 5 seconds')
-        #input_with_timeout("", 5)
-        #time.sleep(5)
-
         if CALIBRATION_MODE:
-            calibrate()
+            __calibrate(timeout=120)
 
     except Exception as e:
         logger.error(f'Calibrate or start Error: {e}')
 
 
-def calibrate():
+def __input_with_timeout(timeout):
+
+    logger.info(f"You have {int(timeout)} seconds to respond.")
+    ready, _, _ = select.select([sys.stdin], [], [], timeout)
+    if ready:
+        return sys.stdin.readline().strip()
+    else:
+        logger.warning("Input timed out.")
+        raise TimeoutError("User input timed out.")
+
+
+def __calibrate(timeout):
+    start_time = time.time()
+
+    def time_remaining():
+        return max(0, timeout - (time.time() - start_time))
+
     try:
         logger.info(f'\033[1;33mStarting the calibration process.\033[0m')
-        arduino = ADC.ArduinoSerial(ARDUINO_PORT, 9600, timeout=1)
+        arduino = ADC.ArduinoSerial(config_manager.get_setting("Parameters", "arduino_port"), 9600, timeout=30)
         arduino.connect()
+
         logger.info(f"Ensure the scale is clear. Press any key once it's empty and you're ready to proceed.")
         time.sleep(1)
-        input()
-        offset = arduino.calib_read()
+        __input_with_timeout(time_remaining())
+
+        offset = arduino.calib_read_mediana()
         logger.info("Offset: {}".format(offset))
         arduino.set_offset(offset)
+
         logger.info("Place a known weight on the scale and then press any key to continue.")
-        input()
-        measured_weight = (arduino.calib_read()-arduino.get_offset())
+        __input_with_timeout(time_remaining())
+
+        measured_weight = (arduino.calib_read_mediana() - arduino.get_offset())
         logger.info("Please enter the item's weight in kg.\n>")
-        item_weight = input()
-        scale = int(measured_weight)/int(item_weight)
+        
+        item_weight = __input_with_timeout(time_remaining())
+        scale = int(measured_weight) / int(item_weight)
         arduino.set_scale(scale)
+
         logger.info(f"\033[1;33mCalibration complete.\033[0m")
         logger.info(f'Calibration details\n\n —Offset: {offset}, \n\n —Scale factor: {scale}')
+        
         config_manager.update_setting("Calibration", "Offset", offset)
         config_manager.update_setting("Calibration", "Scale", scale)
+
         arduino.disconnect()
         del arduino
-    except:
-        logger.error(f'calibration Fail')
-        arduino.disconnect()
 
-
-def _rfid_scale_calib():
-    try:
-        logger.info(f'\033[1;33mStarting the RFID scale calibration process.\033[0m')
-        logger.info(f'\033There should be {CALIBRATION_WEIGHT} kg.\033[')
-        arduino = ADC.ArduinoSerial(ARDUINO_PORT, 9600, timeout=1)
-        arduino.connect()
-        measured_weight = (arduino.calib_read()-arduino.get_offset())
-        scale = int(measured_weight)/CALIBRATION_WEIGHT
-        arduino.set_scale(scale)
-        config_manager.update_setting("Calibration", "Scale", scale)
-        logger.info(f'Calibration details\n\n —Scale factor: {scale}')
+    except TimeoutError:
+        logger.error("Calibration timed out.")
         arduino.disconnect()
         del arduino
-        logger.info(f'\033[1;33mRFID scale calibration process finished succesfully.\033[0m')
-    except:
-        logger.error(f'calibrate Fail')
+    except Exception as e:
+        logger.error(f'Calibration failed: {e}')
         arduino.disconnect()
+        del arduino
 
 
 def _rfid_offset_calib():
@@ -247,7 +223,7 @@ def _rfid_offset_calib():
         logger.info(f'\033[1;33mStarting the RFID taring process.\033[0m')
         arduino = ADC.ArduinoSerial(ARDUINO_PORT, 9600, timeout=1)
         arduino.connect()
-        offset = arduino.calib_read()
+        offset = arduino.calib_read_mediana()
         arduino.set_offset(offset)
         config_manager.update_setting("Calibration", "Offset", offset)
         logger.info(f'Calibration details\n\n —Offset: {offset}')
@@ -259,21 +235,40 @@ def _rfid_offset_calib():
         arduino.disconnect()
 
 
-def _first_weight(arduino_object):
+def _rfid_scale_calib():
     try:
-        for i in range(5):
-            arduino_object._get_measure()
-        return arduino_object._get_measure()
-    except Exception as e:
-        logger.error(f'start_weight Error: {e}')
+        logger.info(f'\033[1;33mStarting the RFID scale calibration process.\033[0m')
+        logger.info(f'\033There should be {CALIBRATION_WEIGHT} kg.\033[')
+        arduino = ADC.ArduinoSerial(ARDUINO_PORT, 9600, timeout=1)
+        arduino.connect()
+        offset = float(config_manager.get_setting("Calibration", "Offset"))
+        mediana = arduino.calib_read_mediana()
+        logger.info(f'Mediana: {mediana}\noffset: {offset}')
+        measured_weight = (mediana - offset)
+        logger.info(f'measured_weight: {measured_weight}\nCALIBRATION_WEIGHT: {CALIBRATION_WEIGHT}')
+        scale = measured_weight/CALIBRATION_WEIGHT
+        logger.info(f'calibration weight is: {CALIBRATION_WEIGHT}')
+        arduino.set_scale(scale)
+        config_manager.update_setting("Calibration", "Scale", scale)
+        logger.info(f'Calibration details\n\n —Scale factor: {scale}')
+        arduino.disconnect()
+        del arduino
+        logger.info(f'\033[1;33mRFID scale calibration process finished succesfully.\033[0m')
+    except:
+        logger.error(f'calibrate Fail')
+        arduino.disconnect()
 
 
 def __process_calibration(animal_id):
     try:
-        if animal_id == CALIBRATION_TARING_RFID:
-            _rfid_offset_calib()
-        elif animal_id == CALIBRATION_SCALE_RFID:
-            _rfid_scale_calib()        
+        if RFID_CABLIBRATION_MODE:
+            if animal_id == CALIBRATION_TARING_RFID:
+                _rfid_offset_calib()
+                return True
+            elif animal_id == CALIBRATION_SCALE_RFID:
+                _rfid_scale_calib()   
+                return True     
+        return False
     except Exception as e:
         logger.error(f'Calibration with RFID: {e}')
 
@@ -291,7 +286,14 @@ def __animal_rfid():
 
 def _process_feeding(weight):
     try:
-        start_weight = _first_weight(weight)       
+
+        if weight is None:
+            event_time = str(datetime.now())
+            post_data = __post_request(event_time, "Arduino Not Connected", "Arduino Not Connected", "Arduino Not Connected", "Arduino Not Connected")
+            __send_post(post_data)
+            return True
+        
+        start_weight = weight.calc_mean()     
         start_time = timeit.default_timer()            
         animal_id = __animal_rfid()
             
@@ -301,64 +303,93 @@ def _process_feeding(weight):
 
         __process_calibration(animal_id) 
 
+        beam_sensor_threshold = 3600 # Для обнаружения загрязнения в секундах
+        beam_sensor_start_time = None
+
         while True:
             if _check_relay_state():
+                if beam_sensor_start_time is None:
+                    beam_sensor_start_time = time.time()
+
+                if time.time() - beam_sensor_start_time > beam_sensor_threshold:
+                    logger.error(f'Possible beam sensor contamination detected.')
+                    event_time = str(datetime.now())
+                    post_data = __post_request(event_time, "Beam Sensor Contamination", "Beam Sensor Contamination", "Beam Sensor Contamination", "Beam Sensor Contamination")
+                    __send_post(post_data)
+                    return True
+                
                 end_time = timeit.default_timer()       
-                end_weight = weight._get_measure()
+                end_weight = weight.calc_mean()
                 logger.info(f'Feed weight: {end_weight}')
                 __process_calibration(animal_id) 
                 animal_id = __animal_rfid()
             else:
+                beam_sensor_start_time = None # Сброс таймера
                 break
+
             time.sleep(1)
-            
-        logger.info(f'While ended.')
 
         feed_time = end_time - start_time           
         feed_time_rounded = round(feed_time, 2)
         final_weight = start_weight - end_weight    
         final_weight_rounded = round(final_weight, 2)
 
-        logger.info(f'Finall result')
-        logger.info(f'finall weight: {final_weight_rounded}')
-        logger.info(f'feed_time: {feed_time_rounded}')
+        logger.debug(f'finall weight: {final_weight_rounded}')
+        logger.debug(f'feed_time: {feed_time_rounded}')    
 
-        eventTime = str(str(datetime.now()))
-
-        if feed_time > 10: 
+        if feed_time > 3: 
+            eventTime = str(str(datetime.now()))
             post_data = __post_request(eventTime, feed_time_rounded, animal_id, final_weight_rounded, end_weight)
             __send_post(post_data)
+        
+        return False
 
     except Exception as e:
-        logger.error(f'Calibration with RFID: {e}')
-    
-    finally:
-        weight.disconnect()
+        logger.error(f'_process_feeding: {e}')
+        return True
 
 
 def feeder_module_v71():
     try:
         # find_arduino()
         _calibrate_or_start()
-        logger.debug(f"'\033[1;35mFeeder project version 7.1.\033[0m'")
-        time.sleep(1)
+        if RFID_READER_USB == False:
+            _set_power_RFID_ethernet()
+
+        weight = initialize_arduino()
+
         while True:  
             try:        
                 if _check_relay_state():
-                    weight = initialize_arduino()
-                    if weight is not None:
-                        try:
-                            _process_feeding(weight)
-                        finally:
-                            weight.disconnect()  
-                    else:
-                        logger.error("Failed to initialize Arduino.")
-            except Exception as e: 
-                logger.error(f'Error: {e}')
+                    try:
+                        if _process_feeding(weight):
+                            logger.info("Ending process based on _process_feeding result.")
+                            break
+                    except Exception as e:
+                        logger.error(f'Error: _process_feeding {e}')
+            except KeyboardInterrupt:
+                logger.info(f'Stopped by user.')
+                break
+            except Exception as e:
+                logger.erro(f'Unexpected error: {e}')
+            finally:
+                time.sleep(0.1)
+    except Exception as e:
+        logger.error(f'Critical error in feeder_module_v71: {e}')
     finally:
-        config_manager.update_setting("Calibration", "calibration_mode", 0)         
+        if weight is not None:
+            weight.disconnect()
+        config_manager.update_setting("Calibration", "calibration_mode", 0)   
+        logger.info("Raspberry Pi will restart in 30 minutes.")
+        time.sleep(1800)  # Ожидание 30 минут (1800 секунд)
+        os.system("sudo shutdown -r now")  # Перезагрузка      
 
 
+
+
+
+
+"""Предыдущая версия алгоритма кормушки. Это основной алгоритм, возможно некоторые функции изменены или удалены."""
 def feeder_module_v61():
     _calibrate_or_start()  
     logger.debug(f"'\033[1;35mFeeder project version 6.1.\033[0m'")

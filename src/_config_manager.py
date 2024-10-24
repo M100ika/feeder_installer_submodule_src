@@ -16,6 +16,7 @@ class ConfigManager:
             config.add_section("Parameters")
             config.add_section("Calibration")
             config.add_section("DbId")
+            config.add_section("Sprayer")
             config.add_section("RFID_Reader")
             config.add_section("Relay")
 
@@ -27,7 +28,9 @@ class ConfigManager:
             config.set("Parameters", "array_url", "https://smart-farm.kz:8502/v2/OneTimeWeighings") 
             config.set("Parameters", "arduino_port", "dev/ttyUSB0") 
             config.set("Parameters", "debug", "1")
+            config.set("Parameters", "database", "0")
             
+            config.set("Calibration", "calibration_mode", "0") 
             config.set("Calibration", "taring_rfid", "")    
             config.set("Calibration", "scaling_rfid", "")    
             config.set("Calibration", "weight", "80")    
@@ -37,13 +40,19 @@ class ConfigManager:
             config.set("DbId", "id", "0") 
             config.set("DbId", "version", "7.1")    
 
-            config.set("Relay", "sensor_pin", "17")
+            config.set("Sprayer", "function", "on") 
+            config.set("Sprayer", "medicine_pin", "18")    
+            config.set("Sprayer", "paint_pin", "23")    
+            config.set("Sprayer", "post_url", "https://smart-farm.kz:8502/api/v2/SprayingTaskResults")    
+            config.set("Sprayer", "l/min", "0.15")    
 
             config.set("RFID_Reader", "reader_usb", "0")
             config.set("RFID_Reader", "reader_port", "/dev/ttyUSB0")
             config.set("RFID_Reader", "reader_power", "26")
             config.set("RFID_Reader", "reader_timeout", "2")
             config.set("RFID_Reader", "reader_buzzer", "1")
+
+            config.set("Relay", "sensor_pin", "17")
 
             with open(self.path, "w") as config_file:
                 config.write(config_file)
