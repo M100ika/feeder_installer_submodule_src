@@ -12,17 +12,13 @@ install_packages(requirement_list)
 from _feeder_module import feeder_module_v71
 from loguru import logger
 from _config_manager import ConfigManager
-import os
 from _glb_val import DEBUG
 
-import platform
-import os
-
 try:
-    import RPi.GPIO as GPIO
+    import RPi.GPIO
     log_dir = '/home/pi/feeder_v71/feeder_installer_submodule_src/feeder_installer_submodule_src\feeder_log'
 except RuntimeError:
-    from __gpio_simulator import MockGPIO as GPIO
+    from __gpio_simulator import MockGPIO
     log_dir = '../feeder_log'
 
 config_manager = ConfigManager()
@@ -42,6 +38,8 @@ def main():
         feeder_module_v71()
     except Exception as e: 
         logger.error(f'Error: {e}')
+
+        
 main()
 
 
