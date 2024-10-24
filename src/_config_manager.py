@@ -3,6 +3,7 @@ import os
 from loguru import logger
 from _headers import CONFIG_FILE_PATH
 
+
 class ConfigManager:
     def __init__(self, path=CONFIG_FILE_PATH):
         self.path = path
