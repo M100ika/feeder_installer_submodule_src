@@ -16,7 +16,7 @@ from _glb_val import DEBUG
 
 try:
     import RPi.GPIO
-    log_dir = '/home/pi/feeder_v71/feeder_installer_submodule_src/feeder_installer_submodule_src\feeder_log'
+    log_dir = "/home/pi/feeder_v71/feeder_installer_submodule_src/feeder_installer_submodule_src/feeder_log"
 except RuntimeError:
     from __gpio_simulator import MockGPIO
     log_dir = '../feeder_log'
