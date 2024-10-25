@@ -1,7 +1,9 @@
 import configparser
 import os
+from pathlib import Path
 from loguru import logger
-from _headers import CONFIG_FILE_PATH
+SRC_DIR = Path(__file__).resolve().parent
+CONFIG_FILE_PATH = SRC_DIR / 'config.ini'
 
 
 class ConfigManager:
