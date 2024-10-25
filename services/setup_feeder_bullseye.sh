@@ -58,7 +58,7 @@ if [ ! -d ".git" ]; then
     git init
     git clone https://github.com/M100ika/feeder_installer_submodule_src.git
     git config --global --add safe.directory "$BASE_DIR"/feeder_installer_submodule_src 
-    sudo chown -R $(whoami) "$BASE_DIR"
+    sudo chown -R $(whoami) "$BASE_DIR"/feeder_installer_submodule_src
     echo_green "Git репозиторий настроен"
 else
     echo_green "Git репозиторий уже существует"
