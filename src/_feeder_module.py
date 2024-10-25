@@ -31,7 +31,7 @@ def _get_relay_state() -> bool:
     return relay_state == GPIO.HIGH
 
 
-def _check_relay_state(check_count=10, threshold=5) -> bool:
+def _check_relay_state(check_count=10, threshold=7) -> bool:
     try:
         high_count = 0
         for _ in range(check_count):
@@ -318,6 +318,8 @@ def _process_feeding(weight):
         beam_sensor_start_time = None
 
         while True:
+            end_time = timeit.default_timer()       
+            end_weight = weight.calc_mean()
             if _check_relay_state():
                 if beam_sensor_start_time is None:
                     beam_sensor_start_time = time.time()
@@ -329,8 +331,7 @@ def _process_feeding(weight):
                     __send_post(post_data)
                     return True
                 
-                end_time = timeit.default_timer()       
-                end_weight = weight.calc_mean()
+                
                 logger.info(f'Feed weight: {end_weight}')
                 __process_calibration(animal_id) 
                 animal_id = __animal_rfid()
