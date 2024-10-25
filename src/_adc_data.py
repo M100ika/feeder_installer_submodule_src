@@ -30,6 +30,10 @@ class ArduinoSerial:
         self.adc_arr = arr
 
 
+    def clean_arr(self):
+        self.adc_arr = []
+
+
     def get_arr(self):  
         return self.adc_arr
 

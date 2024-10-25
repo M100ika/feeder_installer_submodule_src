@@ -300,10 +300,11 @@ def _process_feeding(weight):
 
         if weight is None:
             event_time = str(datetime.now())
-            post_data = __post_request(event_time, "Arduino Not Connected", "Arduino Not Connected", "Arduino Not Connected", "Arduino Not Connected")
+            post_data = __post_request(event_time, 0, "Arduino Not Connected", 0, 0)
             __send_post(post_data)
             return True
         
+        weight.clean_arr()
         start_weight = weight.calc_mean()     
         start_time = timeit.default_timer()            
         animal_id = __animal_rfid()
@@ -319,6 +320,7 @@ def _process_feeding(weight):
 
         while True:
             end_time = timeit.default_timer()       
+            weight.clean_arr()
             end_weight = weight.calc_mean()
             if _check_relay_state():
                 if beam_sensor_start_time is None:
@@ -327,20 +329,22 @@ def _process_feeding(weight):
                 if time.time() - beam_sensor_start_time > beam_sensor_threshold:
                     logger.error(f'Possible beam sensor contamination detected.')
                     event_time = str(datetime.now())
-                    post_data = __post_request(event_time, "Beam Sensor Contamination", "Beam Sensor Contamination", "Beam Sensor Contamination", "Beam Sensor Contamination")
+                    post_data = __post_request(event_time, 0, "Beam Sensor Contamination", 0, 0)
                     __send_post(post_data)
                     return True
                 
                 
                 logger.info(f'Feed weight: {end_weight}')
                 __process_calibration(animal_id) 
-                animal_id = __animal_rfid()
+                if animal_id is None:
+                    animal_id = __animal_rfid()
             else:
                 beam_sensor_start_time = None # Сброс таймера
                 break
 
             time.sleep(1)
-
+        
+        weight.clean_arr()
         feed_time = end_time - start_time           
         feed_time_rounded = round(feed_time, 2)
         final_weight = start_weight - end_weight    
