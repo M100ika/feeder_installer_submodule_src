@@ -46,25 +46,36 @@ def _check_relay_state(check_count=10, threshold=5) -> bool:
         logger.error(f"_Check_relay_state function error: {e}")
 
 
+# def initialize_arduino():
+#     try:
+#         arduino_obj = ADC.ArduinoSerial(ARDUINO_PORT)
+#         arduino_obj.connect()
+        
+#         if not arduino_obj.isOpen():
+#             logger.error(f'Failed to open connection on port {ARDUINO_PORT}')
+#             return None
+        
+#         offset = float(config_manager.get_setting("Calibration", "offset"))
+#         scale = float(config_manager.get_setting("Calibration", "scale"))
+#         arduino_obj.set_offset(offset)
+#         arduino_obj.set_scale(scale)
+        
+#         return arduino_obj
+        
+#     except Exception as e:
+#         logger.error(f'Error connecting or setting calibration: {e}')
+#         return None
+
 def initialize_arduino():
     try:
-        arduino_obj = ADC.ArduinoSerial(ARDUINO_PORT)
-        arduino_obj.connect()
-        
-        if not arduino_obj.isOpen():
-            logger.error(f'Failed to open connection on port {ARDUINO_PORT}')
-            return None
-        
-        offset = float(config_manager.get_setting("Calibration", "offset"))
-        scale = float(config_manager.get_setting("Calibration", "scale"))
-        arduino_obj.set_offset(offset)
-        arduino_obj.set_scale(scale)
-        
-        return arduino_obj
-        
+        obj = ADC.ArduinoSerial(ARDUINO_PORT)
+        obj.connect()
+        offset, scale = float(config_manager.get_setting("Calibration", "offset")), float(config_manager.get_setting("Calibration", "scale"))
+        obj.set_offset(offset)
+        obj.set_scale(scale)
+        return obj
     except Exception as e:
-        logger.error(f'Error connecting or setting calibration: {e}')
-        return None
+        logger.error(f'Error connecting: {e}')
 
 
 def __post_request(event_time, feed_time, animal_id, end_weight, feed_weight) -> dict:
