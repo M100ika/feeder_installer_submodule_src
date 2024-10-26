@@ -299,7 +299,7 @@ def __animal_rfid():
 
 def _process_feeding(weight):
     try:
-
+        logger.debug('_process_feeding start')
         if weight is None:
             event_time = str(datetime.now())
             post_data = __post_request(event_time, 0, "Arduino Not Connected", 0, 0)
@@ -350,7 +350,7 @@ def _process_feeding(weight):
                 break
             logger.debug('while')
             time.sleep(1)
-        
+        logger.debug('while ended')
         
         feed_time = end_time - start_time           
         feed_time_rounded = round(feed_time, 2)
@@ -360,7 +360,7 @@ def _process_feeding(weight):
         logger.debug(f'finall weight: {final_weight_rounded}')
         logger.debug(f'feed_time: {feed_time_rounded}')    
 
-        if feed_time > 5: 
+        if feed_time > 10: 
             eventTime = str(str(datetime.now()))
             post_data = __post_request(eventTime, feed_time_rounded, animal_id, final_weight_rounded, end_weight)
             __send_post(post_data)
