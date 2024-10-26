@@ -294,6 +294,8 @@ def __animal_rfid():
     except Exception as e:
         logger.error(f'RFID reader error: {e}')
 
+    
+
 
 def _process_feeding(weight):
     try:
@@ -304,8 +306,8 @@ def _process_feeding(weight):
             __send_post(post_data)
             return True
         
-        weight.clean_arr()
-        start_weight = weight.calc_mean()     
+        weight.calc_mean()    
+        start_weight = weight.get_measure() 
         start_time = timeit.default_timer()            
         animal_id = __animal_rfid()
             
@@ -318,10 +320,12 @@ def _process_feeding(weight):
         beam_sensor_threshold = 3600 # Для обнаружения загрязнения в секундах
         beam_sensor_start_time = None
 
+        logger.debug('start while')
         while True:
             end_time = timeit.default_timer()       
             weight.clean_arr()
-            end_weight = weight.calc_mean()
+            end_weight = weight.get_measure() 
+            
             if _check_relay_state():
                 if beam_sensor_start_time is None:
                     beam_sensor_start_time = time.time()
@@ -331,6 +335,9 @@ def _process_feeding(weight):
                     event_time = str(datetime.now())
                     post_data = __post_request(event_time, 0, "Beam Sensor Contamination", 0, 0)
                     __send_post(post_data)
+                    logger.info("Raspberry Pi will restart in 30 minutes.")
+                    time.sleep(1800)  # Ожидание 30 минут (1800 секунд)
+                    os.system("sudo shutdown -r now")  # Перезагрузка    
                     return True
                 
                 
@@ -341,10 +348,10 @@ def _process_feeding(weight):
             else:
                 beam_sensor_start_time = None # Сброс таймера
                 break
-
+            logger.debug('while')
             time.sleep(1)
         
-        weight.clean_arr()
+        
         feed_time = end_time - start_time           
         feed_time_rounded = round(feed_time, 2)
         final_weight = start_weight - end_weight    
@@ -353,7 +360,7 @@ def _process_feeding(weight):
         logger.debug(f'finall weight: {final_weight_rounded}')
         logger.debug(f'feed_time: {feed_time_rounded}')    
 
-        if feed_time > 3: 
+        if feed_time > 5: 
             eventTime = str(str(datetime.now()))
             post_data = __post_request(eventTime, feed_time_rounded, animal_id, final_weight_rounded, end_weight)
             __send_post(post_data)
@@ -387,7 +394,7 @@ def feeder_module_v71():
                 logger.info(f'Stopped by user.')
                 break
             except Exception as e:
-                logger.erro(f'Unexpected error: {e}')
+                logger.error(f'Unexpected error: {e}')
             finally:
                 time.sleep(0.1)
     except Exception as e:
@@ -396,9 +403,7 @@ def feeder_module_v71():
         if weight is not None:
             weight.disconnect()
         config_manager.update_setting("Calibration", "calibration_mode", 0)   
-        logger.info("Raspberry Pi will restart in 30 minutes.")
-        time.sleep(1800)  # Ожидание 30 минут (1800 секунд)
-        os.system("sudo shutdown -r now")  # Перезагрузка      
+          
 
 
 
