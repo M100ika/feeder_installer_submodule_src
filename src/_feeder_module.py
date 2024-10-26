@@ -360,7 +360,7 @@ def _process_feeding(weight):
         logger.debug(f'finall weight: {final_weight_rounded}')
         logger.debug(f'feed_time: {feed_time_rounded}')    
 
-        if feed_time > 10: 
+        if feed_time > 15: 
             eventTime = str(str(datetime.now()))
             post_data = __post_request(eventTime, feed_time_rounded, animal_id, final_weight_rounded, end_weight)
             __send_post(post_data)
