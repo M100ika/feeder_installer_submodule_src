@@ -23,6 +23,8 @@ def main():
             sleep(0.5)
     except KeyboardInterrupt or Exception as e:
         logger.info(f'Bye')
+       
+    finally:
         GPIO.cleanup()
 
 main()
