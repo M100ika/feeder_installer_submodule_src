@@ -27,7 +27,7 @@ def _get_relay_state() -> bool:
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(RELAY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     relay_state = GPIO.input(RELAY_PIN)
-    GPIO.cleanup() 
+    
     return relay_state == GPIO.HIGH
 
 
@@ -403,6 +403,7 @@ def feeder_module_v71():
         if weight is not None:
             weight.disconnect()
         config_manager.update_setting("Calibration", "calibration_mode", 0)   
+        GPIO.cleanup() 
           
 
 
