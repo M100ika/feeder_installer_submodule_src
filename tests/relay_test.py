@@ -17,9 +17,9 @@ def main():
     try:
         while True:
             if fdr._check_relay_state():
-                logger.info("Реле замкнуто")
+                logger.info("Реле True")
             else:
-                logger.info("Реле разомкнуто")
+                logger.info("Реле False")
             sleep(0.5)
     except KeyboardInterrupt or Exception as e:
         logger.info(f'Bye')
