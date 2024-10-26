@@ -28,7 +28,7 @@ def _get_relay_state() -> bool:
     GPIO.setup(RELAY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     relay_state = GPIO.input(RELAY_PIN)
     
-    return relay_state == GPIO.HIGH
+    return relay_state != GPIO.HIGH
 
 
 def _check_relay_state(check_count=10, threshold=7) -> bool:
