@@ -25,7 +25,7 @@ config_manager = ConfigManager()
 debug_level = "DEBUG" if DEBUG == 1 else "CRITICAL"
 
 """Инициализация logger для хранения записи о всех действиях программы"""
-logger.add(f'{log_dir}\feeder.log', format="{time} {level} {message}", 
+logger.add(f'{log_dir}/feeder.log', format="{time} {level} {message}", 
 level=debug_level, rotation="1 day", retention= '1 month', compression="zip")  
 
 """Инициализация logger для хранения записи об ошибках программы"""
