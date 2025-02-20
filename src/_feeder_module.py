@@ -94,11 +94,12 @@ def __post_request(event_time, feed_time, animal_id, end_weight, feed_weight) ->
         logger.error(f'__Post_request function error: {v}')
 
 
-def __send_post(postData):
+def __send_post(postData, sql_db):
     try:
         post = requests.post(URL, data = json.dumps(postData), headers = HEADERS, timeout=30)
         logger.info(f'{post.status_code}')
         if post.status_code != 200:
+            sql_db.no_internet(postData)
             raise Exception(f'Response status code: {post.status_code}')
     except Exception as err:
         logger.error(f'Error occurred: {err}')
@@ -335,7 +336,7 @@ def is_valid_rfid(animal_id):
     )
 
 
-def _process_feeding(weight):
+def _process_feeding(weight, sql_db):
     try:
         logger.debug('_process_feeding start')
         if weight is None:
@@ -434,21 +435,22 @@ def _process_feeding(weight):
         if feed_time > 5: 
             eventTime = str(datetime.now())
             post_data = __post_request(eventTime, feed_time_rounded, most_common_animal_id, final_weight_rounded, end_weight)
-            __send_post(post_data)
+            __send_post(post_data, sql_db)
         
         return False
 
     except Exception as e:
         logger.error(f'_process_feeding: {e}')
         return True
-
-
+    
+    
 def feeder_module_v71():
     try:
-        # find_arduino()
         _calibrate_or_start()
         if RFID_READER_USB == False:
             _set_power_RFID_ethernet()
+
+        sql_db = SqlDatabase(db_path='sql_table.db')
 
         weight = initialize_arduino()
 
@@ -461,6 +463,9 @@ def feeder_module_v71():
         previous_weight = sum(weight.get_arr()) / len(weight.get_arr())
         logger.info(f"Initial weight: {previous_weight}")
 
+        last_internet_check = time.time()
+        INTERNET_CHECK_INTERVAL = 300  # Проверка интернета каждые 5 минут
+
         while True:  
             try: 
                 weight.clean_arr()
@@ -470,7 +475,6 @@ def feeder_module_v71():
                 current_weight = sum(weight.get_arr()) / len(weight.get_arr())
 
                 weight_diff = round(current_weight - previous_weight, 2)
-                
 
                 # Если вес увеличился больше чем на threshold, отправляем "ЗАГРУЗКА КОРМА"
                 if weight_diff > weight_change_threshold:       
@@ -478,12 +482,12 @@ def feeder_module_v71():
                     current_weight = round(current_weight, 2)
                     weight_diff = round(weight_diff, 2)
                     post_data = __post_request(event_time, 0, "ЗАГРУЗКА КОРМА", current_weight, weight_diff)
-                    __send_post(post_data)
+                    __send_post(post_data, sql_db)
                     previous_weight = current_weight
 
                 if _check_relay_state():
                     try:
-                        if _process_feeding(weight):
+                        if _process_feeding(weight, sql_db):
                             logger.info("Ending process based on _process_feeding result.")
                             break
                     except Exception as e:
@@ -492,6 +496,12 @@ def feeder_module_v71():
                 else:
                     previous_weight = current_weight
 
+                # Проверка интернета каждые 5 минут
+                current_time = time.time()
+                if current_time - last_internet_check > INTERNET_CHECK_INTERVAL:
+                    sql_db.internet_on()
+                    last_internet_check = current_time
+
             except KeyboardInterrupt:
                 logger.info(f'Stopped by user.')
                 break
@@ -499,19 +509,15 @@ def feeder_module_v71():
                 logger.error(f'Unexpected error: {e}')
             finally:
                 time.sleep(0.1)
-                
+
     except Exception as e:
         logger.error(f'Critical error in feeder_module_v71: {e}')
     finally:
         if weight is not None:
             weight.disconnect()
         config_manager.update_setting("Calibration", "calibration_mode", 0)   
-        GPIO.cleanup() 
-          
-
-
-
-
+        GPIO.cleanup()
+ 
 
 
 """Предыдущая версия алгоритма кормушки. Это основной алгоритм, возможно некоторые функции изменены или удалены."""

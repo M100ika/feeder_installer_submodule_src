@@ -3,41 +3,43 @@ import os
 from loguru import logger
 import requests
 import json
-from _config_manager import ConfigManager
-
+#from _config_manager import ConfigManager
 
 class SqlDatabase:
-    def __init__(self, db_path='sql_table.db'):
-        self.config_manager = ConfigManager()
-        self.__url = self.config_manager.get_setting("Parameters", "url")
+    def __init__(self, db_path='sql_table.db', init_table=True, connection=None):
+        self.__url = "https://smart-farm.kz:8502/api/v2/RawFeedings"
         self.__headers = {'Content-type': 'application/json'}
         self.__sql_table_path = db_path
+        self.__connection = connection
 
-        # Проверка и создание таблицы, если не существует
-        self.__table_check()
+        if init_table:
+            self.__table_check()
+
+    def __get_connection(self):
+        """Использует открытое соединение или создает новое"""
+        if self.__connection:
+            return self.__connection
+        return sqlite3.connect(self.__sql_table_path)
 
     def no_internet(self, payload):
-        """Сохранить данные, если нет интернета."""
         if payload:
             self.__insert_data(payload)
         else:
             logger.error('SqlDatabase no_internet: Empty payload')
 
     def internet_on(self):
-        """Проверить интернет и попытаться отправить сохраненные данные."""
         try:
-            # Проверка наличия интернета перед отправкой
-            requests.get("https://www.google.com", timeout=5)
-
-            # Если интернет есть, пробуем отправить все накопленные данные
-            self.__send_saved_data()
-        except requests.RequestException:
-            logger.warning('Internet is not available. Data will remain in the database.')
+            with self.__get_connection() as db:
+                sql = db.cursor()
+                count = sql.execute("SELECT COUNT(*) FROM json_data").fetchone()[0]
+                if count > 0:
+                    self.__send_saved_data()
+        except Exception as e:
+            logger.error(f'SqlDatabase internet_on: {e}')
 
     def __table_check(self):
-        """Создать таблицу, если не существует"""
         try:
-            with sqlite3.connect(self.__sql_table_path) as db:
+            with self.__get_connection() as db:
                 sql = db.cursor()
                 sql.execute("""CREATE TABLE IF NOT EXISTS json_data (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,26 +49,18 @@ class SqlDatabase:
                     FeedingTime REAL,
                     RFIDNumber TEXT,
                     WeightLambda REAL,
-                    FeedWeight REAL
-                )""")
+                    FeedWeight REAL)""")
                 db.commit()
         except Exception as e:
             logger.error(f'SqlDatabase __table_check: {e}')
 
     def __insert_data(self, payload):
-        """Сохранить данные в базу"""
         try:
-            with sqlite3.connect(self.__sql_table_path) as db:
+            with self.__get_connection() as db:
                 sql = db.cursor()
                 values = self.__table_values_convert(payload)
-                sql.execute(
-                    """INSERT INTO json_data 
-                       (Eventdatetime, EquipmentType, SerialNumber, FeedingTime, RFIDNumber, WeightLambda, FeedWeight) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?);""",
-                    values
-                )
+                sql.execute("INSERT INTO json_data (Eventdatetime, EquipmentType, SerialNumber, FeedingTime, RFIDNumber, WeightLambda, FeedWeight) VALUES (?,?,?,?,?,?,?);", values)
                 db.commit()
-                logger.info(f"Data saved locally: {values}")
         except Exception as e:
             logger.error(f'SqlDatabase __insert_data: {e}')
 
@@ -87,7 +81,7 @@ class SqlDatabase:
 
     def __take_all_data(self):
         try:
-            with sqlite3.connect(self.__sql_table_path) as db:
+            with self.__get_connection() as db:
                 sql = db.cursor()
                 sql.execute("SELECT * FROM json_data")
                 return sql.fetchall()
@@ -97,15 +91,14 @@ class SqlDatabase:
 
     def __delete_saved_data(self, id):
         try:
-            with sqlite3.connect(self.__sql_table_path) as db:
+            with self.__get_connection() as db:
                 sql = db.cursor()
-                sql.execute("DELETE FROM json_data WHERE id = ?", (id,))
+                sql.execute("DELETE from json_data WHERE id = ?", (id,))
                 db.commit()
         except Exception as e:
             logger.error(f'SqlDatabase __delete_saved_data: {e}')
 
     def __send_saved_data(self):
-        """Отправить все сохранённые данные"""
         try:
             all_data = self.__take_all_data()
             for row in all_data:
