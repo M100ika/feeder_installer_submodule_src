@@ -10,6 +10,7 @@ from _chafon_rfid_lib import RFIDReader
 from _sql_database import SqlDatabase
 from _config_manager import ConfigManager
 import _adc_data as ADC
+from collections import Counter
 
 import sys, select, json, time, requests, binascii, socket, os, timeit
 
@@ -129,32 +130,26 @@ def __connect_rfid_reader_ethernet():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((TCP_IP, TCP_PORT))
-            s.setblocking(False)  # Установить сокет в неблокирующий режим
-
-            # Очищаем буфер перед началом
-            while True:
-                ready = select.select([s], [], [], 0.1)  # Ожидание данных в течение 0.1 секунды
-                if ready[0]:
-                    s.recv(BUFFER_SIZE)
-                else:
-                    break
-
-            s.setblocking(True)  # Возвращаем сокет в блокирующий режим
             s.settimeout(RFID_TIMEOUT)
-            s.send(bytearray([0x53, 0x57, 0x00, 0x06, 0xff, 0x01, 0x00, 0x00, 0x00, 0x50]))
-            
-            for attempt in range(1, 4):
-                ready = select.select([s], [], [], RFID_TIMEOUT)
-                if ready[0]:
-                    data = s.recv(BUFFER_SIZE)
-                    if data:
-                        full_animal_id = binascii.hexlify(data).decode('utf-8') 
-                        logger.info(f'Full rfid: {full_animal_id}')
-                        # animal_id = full_animal_id[:-10][-12:]
-                        # logger.info(f'Animal ID: {animal_id}')
-                        return full_animal_id[50:-5] if full_animal_id else None
 
-        return None
+            command = bytearray([0x53, 0x57, 0x00, 0x06, 0xff, 0x01, 0x00, 0x00, 0x00, 0x50])
+            s.send(command)
+
+            ready = select.select([s], [], [], RFID_TIMEOUT)
+            if ready[0]:
+                data = s.recv(BUFFER_SIZE)
+
+                full_animal_id = binascii.hexlify(data).decode('utf-8')
+                logger.info(f'Received raw data: {data}')
+                logger.info(f'Full RFID (hex): {full_animal_id}')
+
+                animal_id = full_animal_id[44:68]  # EPC, 12 байт = 24 символа
+                logger.info(f'Animal EPC: {animal_id}')
+                return animal_id
+            else:
+                logger.info("No RFID data received within timeout")
+                return None
+
     except Exception as e:
         logger.error(f'Error connect RFID reader {e}')
         return None
@@ -294,7 +289,50 @@ def __animal_rfid():
     except Exception as e:
         logger.error(f'RFID reader error: {e}')
 
+
+def _set_antenna_power(power_level):
+    try:
+        logger.info(f"Setting antenna power to {power_level}")
+        command = SET_POWER_MESSAGES.get(power_level)
+        if command is None:
+            logger.error(f"Invalid power level: {power_level}")
+            return False
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((TCP_IP, TCP_PORT))
+            s.send(bytearray(command))
+            response = s.recv(BUFFER_SIZE)
+            logger.info(f"Power set response: {binascii.hexlify(response).decode('utf-8')}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to set antenna power: {e}")
+        return False
     
+
+def _retry_rfid_with_power_levels():
+    power_levels = [10, 15, 20, 26]
+    for power in power_levels:
+        if _set_antenna_power(power):
+            time.sleep(0.5)
+            animal_id = __animal_rfid()
+            if animal_id is not None:
+                logger.info(f"RFID detected at power level {power}: {animal_id}")
+                return animal_id
+    logger.warning("RFID not detected after changing power levels.")
+    return None
+
+
+def is_valid_rfid(animal_id):
+    """
+    Проверка, что animal_id выглядит как более-менее адекватный
+    """
+    return (
+        animal_id and                        # не None и не пустая строка
+        len(animal_id) >= 8 and              # хотя бы 8 символов
+        len(animal_id) <= 64 and             # ограничим максимум
+        any(c.isalnum() for c in animal_id)  # хотя бы одна буква или цифра
+    )
 
 
 def _process_feeding(weight):
@@ -304,13 +342,27 @@ def _process_feeding(weight):
             event_time = str(datetime.now())
             post_data = __post_request(event_time, 0, "Arduino Not Connected", 0, 0)
             __send_post(post_data)
+            time.sleep(60)
+            os.system("sudo reboot")
             return True
         
-        weight.calc_mean()    
-        start_weight = weight.get_measure() 
+        weight.clean_arr()  # Очистим массив перед стартом
+        for _ in range(50):  # Например, взять 50 значений
+            weight.calc_mean()
+            time.sleep(0.05)  # Делаем паузу, чтобы усреднить медленнее
+
+        start_weight = sum(weight.get_arr()) / len(weight.get_arr())
+        logger.info(f"Start weight (mean): {start_weight}")
         start_time = timeit.default_timer()            
         animal_id = __animal_rfid()
-            
+        animal_id_list = []
+
+        if is_valid_rfid(animal_id):
+            animal_id_list.append(animal_id)
+            logger.info(f"RFID added to list: {animal_id}")
+        else:
+            logger.warning(f"Ignored suspicious RFID: {animal_id}")
+
         logger.info(f'Start weight: {start_weight}')      
         logger.info(f'Start time: {start_time}')           
         logger.info(f'Animal ID: {animal_id}')
@@ -322,9 +374,7 @@ def _process_feeding(weight):
 
         logger.debug('start while')
         while True:
-            end_time = timeit.default_timer()       
             weight.clean_arr()
-            end_weight = weight.get_measure() 
             
             if _check_relay_state():
                 if beam_sensor_start_time is None:
@@ -337,21 +387,38 @@ def _process_feeding(weight):
                     __send_post(post_data)
                     logger.info("Raspberry Pi will restart in 30 minutes.")
                     time.sleep(1800)  # Ожидание 30 минут (1800 секунд)
-                    os.system("sudo shutdown -r now")  # Перезагрузка    
+                    os.system("sudo reboot")  # Перезагрузка    
                     return True
                 
-                
-                logger.info(f'Feed weight: {end_weight}')
-                __process_calibration(animal_id) 
-                if animal_id is None:
-                    animal_id = __animal_rfid()
+                current_animal_id = __animal_rfid()  # ВСЕГДА ПРОБОВАТЬ СЧИТАТЬ СНОВА
+
+                if current_animal_id is None:
+                    logger.info("RFID is None. Retrying power levels.")
+                    current_animal_id = _retry_rfid_with_power_levels()
+
+                if is_valid_rfid(current_animal_id):
+                    animal_id_list.append(current_animal_id)
+                    logger.info(f"RFID added to list: {current_animal_id}")
+                else:
+                    logger.warning(f"Ignored suspicious RFID: {current_animal_id}")
+
+                __process_calibration(animal_id)
+
             else:
                 beam_sensor_start_time = None # Сброс таймера
                 break
-            logger.debug('while')
+
             time.sleep(1)
         logger.debug('while ended')
+
+        weight.clean_arr()
+        for _ in range(50):  # Снова берем 50 значений
+            weight.calc_mean()
+            time.sleep(0.05)
+        end_weight = sum(weight.get_arr()) / len(weight.get_arr())
         
+        logger.info(f"End weight (mean): {end_weight}")
+        end_time = timeit.default_timer() 
         feed_time = end_time - start_time           
         feed_time_rounded = round(feed_time, 2)
         final_weight = start_weight - end_weight    
@@ -360,9 +427,13 @@ def _process_feeding(weight):
         logger.debug(f'finall weight: {final_weight_rounded}')
         logger.debug(f'feed_time: {feed_time_rounded}')    
 
+        most_common_animal_id = None
+
+        most_common_animal_id = Counter(animal_id_list).most_common(1)[0][0] if animal_id_list else "UNKNOWN"
+
         if feed_time > 5: 
-            eventTime = str(str(datetime.now()))
-            post_data = __post_request(eventTime, feed_time_rounded, animal_id, final_weight_rounded, end_weight)
+            eventTime = str(datetime.now())
+            post_data = __post_request(eventTime, feed_time_rounded, most_common_animal_id, final_weight_rounded, end_weight)
             __send_post(post_data)
         
         return False
@@ -381,8 +452,35 @@ def feeder_module_v71():
 
         weight = initialize_arduino()
 
+        weight_change_threshold = 5  # Порог для определения загрузки корма
+
+        weight.clean_arr()
+        for _ in range(50):
+            weight.calc_mean()
+            time.sleep(0.05)
+        previous_weight = sum(weight.get_arr()) / len(weight.get_arr())
+        logger.info(f"Initial weight: {previous_weight}")
+
         while True:  
-            try:        
+            try: 
+                weight.clean_arr()
+                for _ in range(20):  # Проверку делаем быстрее, чтобы раньше увидеть загрузку
+                    weight.calc_mean()
+                    time.sleep(0.05)
+                current_weight = sum(weight.get_arr()) / len(weight.get_arr())
+
+                weight_diff = round(current_weight - previous_weight, 2)
+                
+
+                # Если вес увеличился больше чем на threshold, отправляем "ЗАГРУЗКА КОРМА"
+                if weight_diff > weight_change_threshold:       
+                    event_time = str(datetime.now())
+                    current_weight = round(current_weight, 2)
+                    weight_diff = round(weight_diff, 2)
+                    post_data = __post_request(event_time, 0, "ЗАГРУЗКА КОРМА", current_weight, weight_diff)
+                    __send_post(post_data)
+                    previous_weight = current_weight
+
                 if _check_relay_state():
                     try:
                         if _process_feeding(weight):
@@ -390,6 +488,10 @@ def feeder_module_v71():
                             break
                     except Exception as e:
                         logger.error(f'Error: _process_feeding {e}')
+
+                else:
+                    previous_weight = current_weight
+
             except KeyboardInterrupt:
                 logger.info(f'Stopped by user.')
                 break
@@ -397,6 +499,7 @@ def feeder_module_v71():
                 logger.error(f'Unexpected error: {e}')
             finally:
                 time.sleep(0.1)
+                
     except Exception as e:
         logger.error(f'Critical error in feeder_module_v71: {e}')
     finally:
