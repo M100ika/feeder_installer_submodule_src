@@ -127,6 +127,7 @@ def _set_power_RFID_ethernet():
         s.close()     
 
 
+
 def __connect_rfid_reader_ethernet():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -161,7 +162,6 @@ def __connect_rfid_reader_ethernet():
         logger.error(f'Error connect RFID reader: {e}')
         return None
 
-
 def extract_epc_from_raw(raw_data):
     """
     Универсальная функция для извлечения EPC из ответа RFID-ридера.
@@ -171,18 +171,18 @@ def extract_epc_from_raw(raw_data):
         logger.warning("RFID response is too short.")
         return None
 
-    # Предполагаем, что EPC всегда занимает 12 байт (24 символа в hex)
-    epc_candidates = []
-    for start in range(30, 50, 2):  # Перебираем разные позиции начала EPC
-        epc = raw_data[start : start + 24]
-        if len(epc) == 24:
-            epc_candidates.append(epc)
+    # Находим возможные позиции начала EPC (обычно начинается после заголовка)
+    start_positions = [40, 44, 48]  # Возможные позиции EPC
 
-    if not epc_candidates:
-        return None
+    for start in start_positions:
+        epc_candidate = raw_data[start:start + 24]  # EPC 12 байт (24 символа)
+        
+        if len(epc_candidate) == 24:
+            # Удаляем последние 4 символа (CRC)
+            corrected_epc = epc_candidate[:-4]
+            return corrected_epc
 
-    # Возвращаем наиболее вероятный EPC (чаще встречающийся)
-    return max(set(epc_candidates), key=epc_candidates.count)
+    return None
 
 
 def _calibrate_or_start():

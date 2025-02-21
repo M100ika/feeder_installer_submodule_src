@@ -15,7 +15,7 @@ HEADERS = {'Content-type': 'application/json'}
 
 TCP_IP = '192.168.1.250'  
 TCP_PORT = 60000          
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 512
 
 ARDUINO_PORT = config_manager.get_setting("Parameters", "arduino_port") 
 if ARDUINO_PORT == "Отсутствует":
