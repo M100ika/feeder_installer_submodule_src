@@ -80,7 +80,7 @@ class SqlDatabase:
             "EquipmentType": db_row[2],
             "SerialNumber": db_row[3],
             "FeedingTime": db_row[4],
-            "RFIDNumber": db_row[5],
+            "RFIDNumber": "s" + db_row[5],
             "WeightLambda": db_row[6],
             "FeedWeight": db_row[7]
         }
