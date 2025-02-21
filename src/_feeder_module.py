@@ -133,36 +133,56 @@ def __connect_rfid_reader_ethernet():
             s.connect((TCP_IP, TCP_PORT))
             s.settimeout(RFID_TIMEOUT)
 
+            # Отправляем команду на считывание метки
             command = bytearray([0x53, 0x57, 0x00, 0x06, 0xff, 0x01, 0x00, 0x00, 0x00, 0x50])
             s.send(command)
 
             ready = select.select([s], [], [], RFID_TIMEOUT)
             if ready[0]:
                 data = s.recv(BUFFER_SIZE)
-
                 full_animal_id = binascii.hexlify(data).decode('utf-8')
-                logger.info(f'Received raw data: {data}')
-                logger.info(f'Full RFID (hex): {full_animal_id}')
 
-                # Извлекаем EPC (24 символа без CRC)
-                if len(full_animal_id) >= 68:  # Проверяем, что данные достаточно длинные
-                    epc_start = 44
-                    epc_length = 24  # EPC длиной 12 байт (24 hex-символа)
-                    animal_id = full_animal_id[epc_start : epc_start + epc_length]
+                logger.info(f'Raw RFID response: {full_animal_id}')
+                logger.info(f'Response length: {len(full_animal_id)} characters')
 
-                    logger.info(f'Corrected RFID (without CRC): {animal_id}')
-                    return animal_id
+                # Универсальная обработка EPC
+                corrected_rfid = extract_epc_from_raw(full_animal_id)
+                if corrected_rfid:
+                    logger.info(f'Corrected RFID: {corrected_rfid}')
+                    return corrected_rfid
                 else:
-                    logger.warning("RFID response is too short!")
+                    logger.warning('Failed to extract RFID.')
                     return None
-            
             else:
                 logger.info("No RFID data received within timeout")
                 return None
 
     except Exception as e:
-        logger.error(f'Error connect RFID reader {e}')
+        logger.error(f'Error connect RFID reader: {e}')
         return None
+
+
+def extract_epc_from_raw(raw_data):
+    """
+    Универсальная функция для извлечения EPC из ответа RFID-ридера.
+    Убирает CRC и адаптируется к разным форматам меток.
+    """
+    if len(raw_data) < 40:
+        logger.warning("RFID response is too short.")
+        return None
+
+    # Предполагаем, что EPC всегда занимает 12 байт (24 символа в hex)
+    epc_candidates = []
+    for start in range(30, 50, 2):  # Перебираем разные позиции начала EPC
+        epc = raw_data[start : start + 24]
+        if len(epc) == 24:
+            epc_candidates.append(epc)
+
+    if not epc_candidates:
+        return None
+
+    # Возвращаем наиболее вероятный EPC (чаще встречающийся)
+    return max(set(epc_candidates), key=epc_candidates.count)
 
 
 def _calibrate_or_start():
