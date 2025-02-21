@@ -134,10 +134,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-TCP_IP = "192.168.1.100"  # Укажите ваш IP
-TCP_PORT = 4001  # Укажите порт
-BUFFER_SIZE = 1024
-RFID_TIMEOUT = 3  # Таймаут ожидания
 
 def __connect_rfid_reader_ethernet():
     try:
