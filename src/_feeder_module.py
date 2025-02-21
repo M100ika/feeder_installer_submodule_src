@@ -127,6 +127,18 @@ def _set_power_RFID_ethernet():
         s.close()     
 
 
+import socket
+import select
+import binascii
+import logging
+
+logger = logging.getLogger(__name__)
+
+TCP_IP = "192.168.1.100"  # Укажите ваш IP
+TCP_PORT = 4001  # Укажите порт
+BUFFER_SIZE = 1024
+RFID_TIMEOUT = 3  # Таймаут ожидания
+
 def __connect_rfid_reader_ethernet():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -144,8 +156,10 @@ def __connect_rfid_reader_ethernet():
                 logger.info(f'Received raw data: {data}')
                 logger.info(f'Full RFID (hex): {full_animal_id}')
 
-                animal_id = full_animal_id[44:68]  # EPC, 12 байт = 24 символа
-                logger.info(f'Animal EPC: {animal_id}')
+                # Убираем CRC (последние 4 символа)
+                animal_id = full_animal_id[44:64]  
+                logger.info(f'Corrected RFID (without CRC): {animal_id}')
+
                 return animal_id
             else:
                 logger.info("No RFID data received within timeout")
