@@ -63,7 +63,7 @@ echo "$(post_data_to_file)" > /home/pi/Documents/logservice.txt
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Accept: application/json" \
   -H "Content-Type:application/json" \
-  -X POST --data "$(post_data_to_file)" "http://smart-farm.kz:8501/v2/SmartScalesStatuses")
+  -X POST --data "$(post_data_to_file)" "http://smart-farm.kz:8501/api/v2/SmartScalesStatuses")
 
 # Логируем результат
 if [[ "$RESPONSE" -eq 200 ]]; then
