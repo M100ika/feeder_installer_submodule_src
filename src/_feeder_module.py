@@ -127,14 +127,6 @@ def _set_power_RFID_ethernet():
         s.close()     
 
 
-import socket
-import select
-import binascii
-import logging
-
-logger = logging.getLogger(__name__)
-
-
 def __connect_rfid_reader_ethernet():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
