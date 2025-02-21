@@ -144,11 +144,18 @@ def __connect_rfid_reader_ethernet():
                 logger.info(f'Received raw data: {data}')
                 logger.info(f'Full RFID (hex): {full_animal_id}')
 
-                # Убираем CRC (последние 4 символа)
-                animal_id = full_animal_id[44:64]  
-                logger.info(f'Corrected RFID (without CRC): {animal_id}')
+                # Извлекаем EPC (24 символа без CRC)
+                if len(full_animal_id) >= 68:  # Проверяем, что данные достаточно длинные
+                    epc_start = 44
+                    epc_length = 24  # EPC длиной 12 байт (24 hex-символа)
+                    animal_id = full_animal_id[epc_start : epc_start + epc_length]
 
-                return animal_id
+                    logger.info(f'Corrected RFID (without CRC): {animal_id}')
+                    return animal_id
+                else:
+                    logger.warning("RFID response is too short!")
+                    return None
+            
             else:
                 logger.info("No RFID data received within timeout")
                 return None
