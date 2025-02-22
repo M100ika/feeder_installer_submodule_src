@@ -13,10 +13,12 @@ from _feeder_module import feeder_module_v71
 from loguru import logger
 from _config_manager import ConfigManager
 from _glb_val import DEBUG
+import os
 
 try:
     import RPi.GPIO
-    log_dir = "/home/pi/feeder_v71/feeder_installer_submodule_src/feeder_installer_submodule_src/feeder_log"
+    log_dir = "/home/pi/feeder_v71/feeder_installer_submodule_src/loguru/feeder_log"
+    os.system(f"chmod -R 777 {log_dir}")
 except RuntimeError:
     from __gpio_simulator import MockGPIO
     log_dir = '../feeder_log'

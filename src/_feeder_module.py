@@ -412,7 +412,7 @@ def _process_feeding(weight, sql_db):
 
         logger.debug('start while')
         while True:
-            weight.clean_arr()
+            
             
             if _check_relay_state():
                 if beam_sensor_start_time is None:
@@ -447,6 +447,7 @@ def _process_feeding(weight, sql_db):
                 break
 
             time.sleep(1)
+            
         logger.debug('while ended')
 
         end_weight = _take_weight(weight)
