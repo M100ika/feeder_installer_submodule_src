@@ -372,7 +372,7 @@ def _take_weight(weight, count = 50) -> float:
             weight.calc_mean()
             time.sleep(0.05)  # Делаем паузу, чтобы усреднить медленнее
 
-        logger.info(f'ARRAY {weight.get_arr()}')
+        #logger.info(f'ARRAY {weight.get_arr()}')
         return sum(weight.get_arr()) / len(weight.get_arr())
     except Exception as e:
         logger.error(f'Error _take_weight: {e}')
@@ -468,7 +468,7 @@ def _process_feeding(weight, sql_db):
 
         most_common_animal_id = Counter(animal_id_list).most_common(1)[0][0] if animal_id_list else "UNKNOWN"
 
-        if feed_time > 5 and final_weight_rounded > 0.6:
+        if feed_time > 5:
             eventTime = str(datetime.now())
             post_data = __post_request(eventTime, feed_time_rounded, most_common_animal_id, final_weight_rounded, end_weight)
             __send_post(post_data, sql_db)
