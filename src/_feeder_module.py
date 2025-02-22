@@ -127,7 +127,6 @@ def _set_power_RFID_ethernet():
         s.close()     
 
 
-
 def __connect_rfid_reader_ethernet():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -161,6 +160,7 @@ def __connect_rfid_reader_ethernet():
     except Exception as e:
         logger.error(f'Error connect RFID reader: {e}')
         return None
+
 
 def extract_epc_from_raw(raw_data):
     """
@@ -364,6 +364,16 @@ def is_valid_rfid(animal_id):
         any(c.isalnum() for c in animal_id)  # хотя бы одна буква или цифра
     )
 
+def _take_weight(weight, count = 50) -> float:
+    try:
+        weight.clean_arr()  # Очистим массив перед стартом
+        for _ in range(count):  # Например, взять 50 значений
+            weight.calc_mean()
+            time.sleep(0.05)  # Делаем паузу, чтобы усреднить медленнее
+        return sum(weight.get_arr()) / len(weight.get_arr())
+    except Exception as e:
+        logger.error(f'Error _take_weight: {e}')
+
 
 def _process_feeding(weight, sql_db):
     try:
@@ -376,12 +386,9 @@ def _process_feeding(weight, sql_db):
             os.system("sudo reboot")
             return True
         
-        weight.clean_arr()  # Очистим массив перед стартом
-        for _ in range(50):  # Например, взять 50 значений
-            weight.calc_mean()
-            time.sleep(0.05)  # Делаем паузу, чтобы усреднить медленнее
+        
+        start_weight = _take_weight(weight)
 
-        start_weight = sum(weight.get_arr()) / len(weight.get_arr())
         logger.info(f"Start weight (mean): {start_weight}")
         start_time = timeit.default_timer()            
         animal_id = __animal_rfid()
@@ -422,9 +429,9 @@ def _process_feeding(weight, sql_db):
                 
                 current_animal_id = __animal_rfid()  # ВСЕГДА ПРОБОВАТЬ СЧИТАТЬ СНОВА
 
-                if current_animal_id is None:
-                    logger.info("RFID is None. Retrying power levels.")
-                    current_animal_id = _retry_rfid_with_power_levels()
+                # if current_animal_id is None:
+                #     logger.info("RFID is None. Retrying power levels.")
+                #     current_animal_id = _retry_rfid_with_power_levels()
 
                 if is_valid_rfid(current_animal_id):
                     animal_id_list.append(current_animal_id)
@@ -441,11 +448,7 @@ def _process_feeding(weight, sql_db):
             time.sleep(1)
         logger.debug('while ended')
 
-        weight.clean_arr()
-        for _ in range(50):  # Снова берем 50 значений
-            weight.calc_mean()
-            time.sleep(0.05)
-        end_weight = sum(weight.get_arr()) / len(weight.get_arr())
+        end_weight = _take_weight(weight)
         
         logger.info(f"End weight (mean): {end_weight}")
         end_time = timeit.default_timer() 
@@ -480,33 +483,22 @@ def feeder_module_v71():
             _set_power_RFID_ethernet()
 
         sql_db = SqlDatabase(db_path='sql_table.db')
-
         weight = initialize_arduino()
 
-        weight_change_threshold = 5  # Порог для определения загрузки корма
-
-        weight.clean_arr()
-        for _ in range(50):
-            weight.calc_mean()
-            time.sleep(0.05)
-        previous_weight = sum(weight.get_arr()) / len(weight.get_arr())
+          # Порог для определения загрузки корма
+        previous_weight = _take_weight(weight)
         logger.info(f"Initial weight: {previous_weight}")
 
         last_internet_check = time.time()
-        INTERNET_CHECK_INTERVAL = 300  # Проверка интернета каждые 5 минут
+          # Проверка интернета каждые 5 минут
 
         while True:  
             try: 
-                weight.clean_arr()
-                for _ in range(20):  # Проверку делаем быстрее, чтобы раньше увидеть загрузку
-                    weight.calc_mean()
-                    time.sleep(0.05)
-                current_weight = sum(weight.get_arr()) / len(weight.get_arr())
-
+                current_weight = _take_weight(weight, 20)
                 weight_diff = round(current_weight - previous_weight, 2)
 
                 # Если вес увеличился больше чем на threshold, отправляем "ЗАГРУЗКА КОРМА"
-                if weight_diff > weight_change_threshold:       
+                if weight_diff > WEIGHT_CHANGE_THRESHOLD:       
                     event_time = str(datetime.now())
                     current_weight = round(current_weight, 2)
                     weight_diff = round(weight_diff, 2)
