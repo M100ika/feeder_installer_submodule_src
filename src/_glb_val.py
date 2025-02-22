@@ -23,7 +23,7 @@ if ARDUINO_PORT == "Отсутствует":
 
 INTERNET_CHECK_INTERVAL = 300
 
-WEIGHT_CHANGE_THRESHOLD = 20 
+WEIGHT_CHANGE_THRESHOLD = 10 
 
 CALIBRATION_MODE = int(config_manager.get_setting("Calibration", "calibration_mode"))
 RFID_CABLIBRATION_MODE = int(config_manager.get_setting("Calibration", "rfid_calibration_mode"))

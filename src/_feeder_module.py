@@ -512,16 +512,14 @@ def feeder_module_v71():
                             logger.info("Ending process based on _process_feeding result.")
                             break
                     except Exception as e:
-                        logger.error(f'Error: _process_feeding {e}')
-
-                else:
-                    previous_weight = current_weight
+                        logger.error(f'Error: _process_feeding {e}')                  
 
                 # Проверка интернета каждые 5 минут
                 current_time = time.time()
                 if current_time - last_internet_check > INTERNET_CHECK_INTERVAL:
                     sql_db.internet_on()
                     last_internet_check = current_time
+                    previous_weight = current_weight
 
             except KeyboardInterrupt:
                 logger.info(f'Stopped by user.')
