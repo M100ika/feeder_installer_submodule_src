@@ -136,6 +136,7 @@ def __connect_rfid_reader_ethernet():
             # Отправляем команду на считывание метки
             command = bytearray([0x53, 0x57, 0x00, 0x06, 0xff, 0x01, 0x00, 0x00, 0x00, 0x50])
             s.send(command)
+            time.sleep(0.2)
 
             ready = select.select([s], [], [], RFID_TIMEOUT)
             if ready[0]:
