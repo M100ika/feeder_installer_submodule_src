@@ -18,6 +18,9 @@ import os
 try:
     import RPi.GPIO
     log_dir = "/home/pi/feeder_v71/feeder_installer_submodule_src/loguru/feeder_log"
+    error_log_dir = f"{log_dir}/error_log"
+    os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(error_log_dir, exist_ok=True)
     os.system(f"chmod -R 777 {log_dir}")
 except RuntimeError:
     from __gpio_simulator import MockGPIO
@@ -27,11 +30,11 @@ config_manager = ConfigManager()
 debug_level = "DEBUG" if DEBUG == 1 else "CRITICAL"
 
 """Инициализация logger для хранения записи о всех действиях программы"""
-logger.add(f'{log_dir}/feeder.log', format="{time} {level} {message}", 
+logger.add(f"{log_dir}/feeder.log", format="{time} {level} {message}", 
 level=debug_level, rotation="1 day", retention= '1 month', compression="zip")  
 
 """Инициализация logger для хранения записи об ошибках программы"""
-logger.add(f'{log_dir}/error_log/error.log', format="{time} {level} {file}:{line} {message}", 
+logger.add(f"{error_log_dir}/error.log", format="{time} {level} {file}:{line} {message}", 
 level="ERROR", rotation="1 day", retention= '1 month', compression="zip") 
 
 os.system(f"chmod -R 777 {log_dir}/feeder.log")
