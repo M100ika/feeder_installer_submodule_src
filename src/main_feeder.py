@@ -33,6 +33,10 @@ level=debug_level, rotation="1 day", retention= '1 month', compression="zip")
 """Инициализация logger для хранения записи об ошибках программы"""
 logger.add(f'{log_dir}/error_log/error.log', format="{time} {level} {file}:{line} {message}", 
 level="ERROR", rotation="1 day", retention= '1 month', compression="zip") 
+
+os.system(f"chmod -R 777 {log_dir}/feeder.log")
+os.system(f"chmod -R 777 {log_dir}/error_log/error.log")
+
        
 @logger.catch
 def main():
