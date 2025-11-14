@@ -17,6 +17,7 @@ logger.add(sys.stderr, format="{time} {level} {file}:{line} {message}", level="D
 def main():
     try:
         logger.info(f'\033[1;35mFeeder project. Weight measurment test file.\033[0m')
+        fdr._calibrate_or_start()
         arduino = fdr.initialize_arduino()
         while True:
             weight = arduino.get_measure()
