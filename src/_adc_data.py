@@ -81,16 +81,16 @@ class ArduinoSerial:
     def calc_mean(self):  
         adc_val = self.get_measure()
         
-        # Проверяем, чтобы значение не было отрицательным
-        if adc_val < 0:
-            return round(sum(self.adc_arr)/len(self.adc_arr), 2) if self.adc_arr else 0  # Возвращаем среднее, если есть данные
+        if adc_val < 0:  # Игнорируем отрицательные значения
+            return statistics.median(self.adc_arr) if self.adc_arr else 0
 
         if len(self.adc_arr) == self.window:
             self.adc_arr.pop(0)
+
         self.adc_arr.append(adc_val)
 
-        adc_avg = sum(self.adc_arr) / len(self.adc_arr)
-        return round(adc_avg, 2)
+        return statistics.median(self.adc_arr)  # Убираем влияние выбросов
+
 
 
 
