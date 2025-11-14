@@ -1,16 +1,18 @@
 [Unit]
-Description=feeder_v71.service Service
-After=network.target
+Description=Feeder v71 daemon
+After=network-online.target
+Wants=network-online.target
 
 [Service]
+User=pi
+WorkingDirectory=/home/pi/feeder_v71/feeder_installer_submodule_src
 ExecStart=/home/pi/feeder_v71/feeder_installer_submodule_src/vfeeder/bin/python /home/pi/feeder_v71/feeder_installer_submodule_src/src/main_feeder.py
-WorkingDirectory=/home/pi/
-StandardOutput=inherit
-StandardError=inherit
 Restart=always
 RestartSec=10
-User=root
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
-TimeoutStopSec=30
