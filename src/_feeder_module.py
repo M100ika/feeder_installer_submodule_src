@@ -44,9 +44,10 @@ def _check_relay_state(check_count=10, threshold=7) -> bool:
                     return True
             time.sleep(0.1)  
 
-        return False
+       
     except Exception as e:
         logger.error(f"_Check_relay_state function error: {e}")
+    return False
 
 
 # def initialize_arduino():
