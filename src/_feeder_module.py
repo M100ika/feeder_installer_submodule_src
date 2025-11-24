@@ -24,11 +24,13 @@ from _glb_val import *
 config_manager = ConfigManager()
 
 
-def _get_relay_state() -> bool:
+def _init_gpio_relay():
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(RELAY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.setup(RELAY_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+
+def _get_relay_state() -> bool:
     relay_state = GPIO.input(RELAY_PIN)
-    
     return relay_state == GPIO.LOW
 
 
@@ -495,6 +497,7 @@ def feeder_module_v71():
 
         last_internet_check = time.time()
           # Проверка интернета каждые 5 минут
+        _init_gpio_relay()
 
         while True:  
             try: 

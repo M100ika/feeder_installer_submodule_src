@@ -15,6 +15,7 @@ logger.add(sys.stderr, format="{time} {level} {message}", level="DEBUG")
 
 def main():
     try:
+        fdr._init_gpio_relay()
         while True:
             if fdr._check_relay_state():
                 logger.info("Реле True")
