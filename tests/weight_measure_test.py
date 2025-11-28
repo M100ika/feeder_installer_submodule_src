@@ -19,6 +19,12 @@ def main():
         logger.info(f'\033[1;35mFeeder project. Weight measurment test file.\033[0m')
         fdr._calibrate_or_start()
         arduino = fdr.initialize_arduino()
+        test_check = input()
+        if test_check == 't':  
+            while True:
+                print(arduino.read_data())
+                sleep(0.1)
+
         while True:
             weight = arduino.get_measure()
             logger.info(f"Weight is: {weight}\n")

@@ -1,6 +1,7 @@
 import serial
 from collections import Counter
 import statistics
+import time
 
 
 class ArduinoSerial:
@@ -20,6 +21,7 @@ class ArduinoSerial:
 
     def connect(self): 
         self.arduino = serial.Serial(self.port, self.baud_rate, bytesize=serial.EIGHTBITS, timeout = self.timeout)
+        time.sleep(2)
 
 
     def disconnect(self):  
@@ -92,8 +94,6 @@ class ArduinoSerial:
         return statistics.median(self.adc_arr)  # Убираем влияние выбросов
 
 
-
-
     def common_filter(self): 
         return Counter(self.get_arr()).most_common(1)[0][0]
     
@@ -105,7 +105,6 @@ class ArduinoSerial:
 
 
     def read_average(self, times=16):
-
         sum = 0
         for i in range(times):
             sum += self.read_data()
