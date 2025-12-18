@@ -474,7 +474,7 @@ def _process_feeding(weight, sql_db):
 
         most_common_animal_id = Counter(animal_id_list).most_common(1)[0][0] if animal_id_list else "UNKNOWN"
 
-        if feed_time > 5:
+        if feed_time > 20:
             eventTime = str(datetime.now())
             post_data = __post_request(eventTime, feed_time_rounded, most_common_animal_id, final_weight_rounded, end_weight)
             __send_post(post_data, sql_db)
