@@ -22,6 +22,7 @@ except RuntimeError:
 from _glb_val import *
 
 config_manager = ConfigManager()
+_usb_rfid_reader = None  # Инициализируется один раз и переиспользуется
 
 
 def _init_gpio_relay():
@@ -315,11 +316,13 @@ def __process_calibration(animal_id):
 
 def __animal_rfid():
     try:
+        global _usb_rfid_reader
         if RFID_READER_USB:
-            rfid_reader = RFIDReader()
-            return rfid_reader.connect()
-        else:
-            return __connect_rfid_reader_ethernet() 
+            if _usb_rfid_reader is None:
+                _usb_rfid_reader = RFIDReader()
+                _usb_rfid_reader.open()
+            return _usb_rfid_reader.read_tag()
+        return __connect_rfid_reader_ethernet()
     except Exception as e:
         logger.error(f'RFID reader error: {e}')
 
@@ -542,6 +545,8 @@ def feeder_module_v71():
     finally:
         if weight is not None:
             weight.disconnect()
+        if RFID_READER_USB and _usb_rfid_reader is not None:
+            _usb_rfid_reader.close()
         config_manager.update_setting("Calibration", "calibration_mode", 0)   
         GPIO.cleanup()
  
@@ -597,4 +602,3 @@ def feeder_module_v61():
         except Exception as e:
             logger.error(f'Error: {e}')
             weight.disconnect()
-
