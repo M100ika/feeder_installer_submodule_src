@@ -44,7 +44,6 @@ def _check_relay_state(check_count=10, threshold=7) -> bool:
                 if high_count >= threshold:
                     return True
             time.sleep(0.1)  
-
        
     except Exception as e:
         logger.error(f"_Check_relay_state function error: {e}")
@@ -70,6 +69,7 @@ def _check_relay_state(check_count=10, threshold=7) -> bool:
 #     except Exception as e:
 #         logger.error(f'Error connecting or setting calibration: {e}')
 #         return None
+
 
 def initialize_arduino():
     try:
@@ -419,9 +419,8 @@ def _process_feeding(weight, sql_db):
         beam_sensor_start_time = None
 
         logger.debug('start while')
-        while True:
-            
-            
+
+        while True:    
             if _check_relay_state():
                 if beam_sensor_start_time is None:
                     beam_sensor_start_time = time.time()
