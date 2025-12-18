@@ -236,8 +236,8 @@ def __calibrate(timeout):
         measured_weight = (arduino.calib_read_mediana() - arduino.get_offset())
         logger.info("Please enter the item's weight in kg.\n>")
         
-        item_weight = __input_with_timeout(time_remaining())
-        scale = int(measured_weight) / int(item_weight)
+        item_weight = float(__input_with_timeout(time_remaining()))
+        scale = float(measured_weight) / item_weight
         arduino.set_scale(scale)
 
         logger.info(f"\033[1;33mCalibration complete.\033[0m")
